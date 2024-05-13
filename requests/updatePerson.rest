@@ -1,0 +1,18 @@
+PUT http://localhost:3001/api/phonebook/1
+Content-Type: application/json
+
+{
+  "number": "1234"
+}
+
+###
+PUT http://localhost:3001/api/phonebook/1
+Content-Type: application/json
+
+###
+PUT http://localhost:3001/api/phonebook/100
+Content-Type: application/json
+
+{
+  "number": "1234"
+}
