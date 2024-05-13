@@ -9,6 +9,8 @@ const morgan = require('morgan')
 morgan.token('request_body', (request) => JSON.stringify(request.body))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :request_body'))
 
+app.use(express.static('dist'))
+
 let phonebook = [
   {
     "id": 1,
@@ -31,10 +33,6 @@ let phonebook = [
     "number": "39-23-6423122"
   }
 ]
-
-app.get('/', (_req, res) => {
-  res.send('Phonebook App')
-})
 
 app.get('/api/phonebook', (_req, res) => {
   res.json(phonebook)
