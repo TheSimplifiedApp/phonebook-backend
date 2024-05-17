@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const express = require('express')
 const app = express()
 app.use(express.json())
@@ -9,95 +11,73 @@ const morgan = require('morgan')
 morgan.token('request_body', (request) => JSON.stringify(request.body))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :request_body'))
 
+const Phonebook = require('./models/phonebook')
+
 app.use(express.static('dist'))
 
-let phonebook = [
-  {
-    "id": 1,
-    "name": "Arto Hellas",
-    "number": "040-123456"
-  },
-  {
-    "id": 2,
-    "name": "Ada Lovelace",
-    "number": "39-44-5323523"
-  },
-  {
-    "id": 3,
-    "name": "Dan Abramov",
-    "number": "12-43-234345"
-  },
-  {
-    "id": 4,
-    "name": "Mary Poppendieck",
-    "number": "39-23-6423122"
-  }
-]
-
 app.get('/api/phonebook', (_req, res) => {
-  res.json(phonebook)
+  Phonebook
+    .find({})
+    .then(results => res.json(results))
 })
 
-app.get('/api/phonebook/:id', (req, res) => {
-  const id = Number(req.params.id)
-  const person = phonebook.find(p => p.id === id)
-  if (!person) {
-    res.status(404).json({ error: "no match found" })
-  }
-  res.json(person)
+app.get('/api/phonebook/:id', (req, res, next) => {
+  Phonebook
+    .findById(req.params.id)
+    .then(person => {
+      console.log(person)
+      if (person) {
+        res.json(person)
+      } else {
+        res.status(404).end
+      }
+    })
+    .catch(error => next(error))
 })
 
-app.post('/api/phonebook', (req, res) => {
-  const body = req.body
+app.post('/api/phonebook', (req, res, next) => {
+  const { name, number } = req.body
 
-  if (!body.name || !body.number) {
-    return res.status(400).json({ error: 'name or number missing' })
-  }
+  const newPerson = new Phonebook({ name, number })
 
-  if (phonebook.find(p => p.name === body.name)) {
-    return res.status(400).json({ error: `${body.name} already exist` })
-  }
-
-  const newPerson = {
-    id: Math.max(...phonebook.map(p => p.id)) + 1,
-    name: body.name,
-    number: body.number
-  }
-
-  phonebook = phonebook.concat(newPerson)
-
-  res.json(newPerson)
+  newPerson
+    .save()
+    .then(returnedPerson => res.json(returnedPerson))
+    .catch(error => next(error))
 })
 
-app.put('/api/phonebook/:id', (req, res) => {
+app.put('/api/phonebook/:id', (req, res, next) => {
 
-  const body = req.body
-  if (!body.number) {
-    return res.status(400).json({ error: 'number missing' })
-  }
+  const { name, number } = req.body
 
-  const id = Number(req.params.id)
-  const personToUpdate = phonebook.find(p => p.id === id)
-
-  if (personToUpdate) {
-    const updatedPerson = { ...personToUpdate, ...body }
-    phonebook.map(p => p === id ? updatedPerson : p)
-    return res.json(updatedPerson)
-  }
-
-  res.status(404).json({ error: 'no match found' })
+  Phonebook
+    .findByIdAndUpdate(req.params.id, { name, number }, { new: true, runValidators: true, context: 'query' })
+    .then(updatedPerson => res.json(updatedPerson))
+    .catch(error => next(error))
 })
 
 app.delete('/api/phonebook/:id', (req, res) => {
-  const id = Number(req.params.id)
-  phonebook = phonebook.filter(p => p.id !== id)
-  res.status(204).end()
+  Phonebook
+    .findByIdAndDelete(req.params.id)
+    .then(() => res.status(204).end())
 })
 
 const unknownEndpoint = (req, res) => {
   res.status(400).json({ error: 'unknown endpoint' })
 }
 app.use(unknownEndpoint)
+
+const errorHandler = (error, req, res, next) => {
+  console.error(error.message)
+  if (error.name === 'CastError') {
+    return res.status(400).send({ error: 'malformatted id' })
+  } else if (error.name === 'ValidationError') {
+    return res.status(400).json({ error: error.message })
+  }
+  next(error)
+}
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
